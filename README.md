@@ -85,6 +85,31 @@ itself:
 Because none of that depends on a network round trip at fire time, every
 transaction can be signed before the stage opens.
 
+## Preflight
+
+`SeaDrop.mintPublic()` runs seven checks in a fixed order and reverts on the
+first that fails. ZARV reproduces all seven locally against live chain state
+before anything is signed, and tells you which one would break:
+
+```
+0xd240305dD17A69fe39015002461FB2916C345425
+  ok   stage window          stage is open
+  ok   quantity              2 requested
+  FAIL wallet cap            6 already minted, 8/7 after this
+  ok   collection supply     4210/10000 minted, 5790 left
+  ok   fee recipient set     0x0000a26b00c1F0DF003000390027140000fAa719
+  ok   fee recipient allowed allowed by the drop
+  ok   payment               0 for 2 at 0
+  -> would revert with MintQuantityExceedsMaxMintedPerWallet. Not sending.
+```
+
+The wallet and supply guards read `getMintStats(minter)` on the token contract —
+the same call SeaDrop consults internally. That state is per wallet, so a drop
+can be live, cheap and open and still revert for one wallet and not another.
+Nothing in the drop config tells you that; only the stats call does.
+
+Cost of knowing: a few `eth_call`s. Cost of not knowing: a burnt transaction.
+
 ## Understanding the gas ceiling
 
 Three numbers, and mixing them up is the most common way to lose a mint:
@@ -139,9 +164,6 @@ provided as is, without warranty of any kind.
 ## License
 
 MIT — see [LICENSE](LICENSE).
-
-`src/mint.ts` follows the SeaDrop call approach used in
-[nft-public-mint](https://github.com/morsyxbt/nft-public-mint) (MIT).
 
 ---
 
