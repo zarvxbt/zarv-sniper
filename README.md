@@ -1,126 +1,148 @@
-# ZARV Sniper
+# ZARV
 
-A command-line NFT mint sniper for OpenSea SeaDrop public stages, on Robinhood Chain, Base and Ethereum.
+NFT mint tooling for Robinhood Chain. Three pieces, one engine.
 
-Every value in the transaction — price, fee recipient, per-wallet cap, the live window — is read from the SeaDrop contract itself. There is no OpenSea account, no login, no API key, and nothing to rate-limit you at the moment the stage opens.
+| | What it is | Install |
+|---|---|---|
+| **[zsniper.vercel.app](https://zsniper.vercel.app)** | Live mint intelligence — scan any drop, live feed, trending, watchlist | none |
+| **Chrome extension** | The sniper. Encrypted local vault, mints from your browser | load unpacked |
+| **CLI + dashboard** | Same engine on the command line, or a local web dashboard | Node 18+ |
 
-```
-  ╔═══════════════════════════════════════════╗
-  ║           Z A R V   S N I P E R           ║
-  ║     SeaDrop · on-chain calldata · fast     ║
-  ╚═══════════════════════════════════════════╝
-```
+Every value in every transaction is read from the SeaDrop contract itself. No
+OpenSea account, no login, no API key, and nothing to rate-limit you at the
+moment a stage opens.
 
-## What it does
+---
 
-- **Reads the drop from chain state.** Price, fee recipient and per-wallet limit come from `SeaDrop.getPublicDrop()` and `getAllowedFeeRecipients()`, not from a guess or an API.
-- **Shows you the drop before you commit.** Price, cap, live window and calldata size are printed, and you confirm before anything is signed.
-- **Multi-wallet.** Paste as many keys as you like; they mint in parallel.
-- **Scheduling.** Fire now, or hold until a specific time.
-- **Masked key entry.** Keys render as stars, are held in memory for the run, and are never written to disk.
-- **Gas guards.** Rejects a tip above your ceiling before it can be bounced by every node.
-- **Two interfaces.** A local web dashboard, or the CLI wizard. Same mint code behind both.
+## The site
 
-## Requirements
+**[zsniper.vercel.app](https://zsniper.vercel.app)** — no install, nothing to sign up for.
 
-Node.js 18 or newer (`node --version`) and a wallet with gas on the chain you are minting on.
+- **Drop scanner** — real price, per-wallet cap, creator fee, fee recipient, supply bar, open and close times
+- **Live countdown** — opens-in / closes-in, days-aware
+- **Wallet checker** — how many a given address has already minted, and how many it has left
+- **Live mints** — recent `SeaDropMint` events straight off the chain, refreshed every 20s
+- **Trending** — collections ranked by items minted in the recent block window
+- **Watchlist** — saved in your own browser, with live status and countdowns
+- **Shareable links** — `/?c=0x…` scans on load
 
-## Install
+No database, no accounts, no tracking. The API routes exist only to keep
+`eth_getLogs` off the client and dodge CORS on the public RPC.
+
+## The extension
+
+The site tells you what's happening. The extension mints.
+
+1. Open `chrome://extensions`
+2. Turn on **Developer mode**
+3. **Load unpacked** → select the `extension/` folder
+
+On first run you create a vault: paste your keys, choose a password. They're
+encrypted with **AES-GCM**, key derived by **PBKDF2-SHA256 at 310,000
+iterations**, before they ever touch extension storage.
+
+**Your keys cannot leave your machine.** Not "we promise not to send them" —
+they *cannot* be sent. The manifest grants network access to three Robinhood RPC
+endpoints and nothing else, so there is no host the extension could post them
+to. It's four lines of `manifest.json`; read it yourself.
+
+There is deliberately no hosted version of the minting. A website that takes
+private keys is indistinguishable from a wallet drainer, whatever the intent
+behind it.
+
+## The CLI and local dashboard
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/zarv-sniper.git
+git clone https://github.com/zarvxbt/zarv-sniper.git
 cd zarv-sniper
 npm install
 npm run build
 ```
 
-## Run
-
-Two interfaces, same engine underneath.
-
-### Dashboard
-
 ```bash
-npm run ui
+npm run ui      # local dashboard at 127.0.0.1:3000
+npm start       # CLI wizard
 ```
 
-Opens a local dashboard at `http://127.0.0.1:3000` — wallet grid, on-chain drop preview, live log, per-wallet status. Read the drop before committing, then fire.
+Multi-wallet, parallel minting, scheduled fire, masked key entry, EIP-1559
+guards. Keys are held in memory for the run and never written to disk.
 
-The server binds to `127.0.0.1` only. The page is served by your own machine, so keys typed into it never cross the network. **Never run a version of this that sends keys to a remote server** — hosted key entry is indistinguishable from a wallet drainer, whatever the intent.
+---
 
-### CLI
+## How the mint is built
 
-```bash
-npm start
-```
+Most tools ask OpenSea's API for the calldata. That's roughly a second of
+round-trip sitting in your critical path, plus a rate limit that can cost you
+the mint, plus an outage you can't do anything about.
 
-The wizard asks seven things:
+ZARV reads the drop from the SeaDrop singleton and assembles the transaction
+itself:
 
-| Step | What it wants |
-|------|---------------|
-| 1. Private keys | One per line, hidden as you type. Each is confirmed back by its address so you can check you pasted the right one. Blank line to finish. |
-| 2. Chain | Robinhood, Base or Ethereum. |
-| 3. Contract | The NFT contract address. |
-| 4. Quantity | How many per wallet. |
-| 5. Gas | Tip and ceiling. Defaults are 0.05 / 1 gwei. |
-| 6. RPC | Blank for the public endpoint, or paste a URL or an Alchemy key. |
-| 7. Timing | Fire now, or wait for a time. |
+- `getPublicDrop(nftContract)` on the SeaDrop singleton — price, window, per-wallet cap
+- `getAllowedFeeRecipients(nftContract)` — the fee recipient, resolved on-chain rather than guessed
+- `mintPublic(nftContract, feeRecipient, address(0), quantity)` — `address(0)` credits the caller, so the calldata is identical for every wallet and can be built once
 
-Then it prints a summary and asks `Fire?`. Nothing is sent until you type `y`.
+Because none of that depends on a network round trip at fire time, every
+transaction can be signed before the stage opens.
 
 ## Understanding the gas ceiling
 
-Three numbers, and confusing them is the most common way to lose a mint:
+Three numbers, and mixing them up is the most common way to lose a mint:
 
 | Term | What it is | Who sets it |
-|------|-----------|-------------|
+|---|---|---|
 | Base fee | The network's price. Burned. | The chain |
 | Priority fee (tip) | Paid on top, to the block producer | You |
-| Max fee | The ceiling you will tolerate | You |
+| Max fee | The ceiling you'll tolerate | You |
 
 You pay `base fee + tip`. The ceiling is only a cap.
 
-**But the ceiling is not free.** Before a node will accept your transaction it checks that your wallet holds `gasLimit × maxFee + mint price`. At 250,000 gas, a 50 gwei ceiling reserves 0.0125 ETH — so a thin wallet gets rejected outright even on a free mint where the real cost is a fraction of a cent. On a chain with a 0.02 gwei base fee, a 1 gwei ceiling is ample.
+**But the ceiling is not free.** Before a node will accept your transaction it
+checks that your wallet holds `gasLimit × maxFee + mint price`. At 250,000 gas a
+50 gwei ceiling reserves 0.0125 ETH — so a thin wallet gets rejected outright,
+even on a free mint costing a fraction of a cent. On a chain with a 0.02 gwei
+base fee, a 1 gwei ceiling is plenty. ZARV warns you before it fires.
 
 ## Scope
 
-Public SeaDrop stages only.
+Public SeaDrop stages.
 
-Allowlist stages come in two kinds. Merkle-gated stages use `mintAllowList()` and are buildable from public data. Signed stages use `mintSigned()` and carry a signature only OpenSea's server can produce. Neither is supported here yet.
+Allowlist stages come in two kinds. Merkle-gated stages use `mintAllowList()`
+and are buildable from public data. Signed stages use `mintSigned()` and carry a
+signature only OpenSea's server can produce. Both are built and in testing —
+they ship once they've been run against live drops, not before.
 
 ## Security
 
-Private keys are pasted at run time, masked on screen, held in memory for that run, and never written to disk or sent anywhere except as a locally-signed transaction. `.env`, `wallets/` and `*.key` are git-ignored.
+- Keys are pasted at run time or held in an encrypted local vault
+- Never written to disk in plaintext, never transmitted anywhere except as a locally-signed transaction
+- `.env`, `wallets/` and `*.key` are git-ignored
+- Use dedicated hot wallets funded with only what you intend to spend
 
-Use dedicated hot wallets funded with only what you intend to spend.
+`src/mint.ts` is about 250 lines and is the whole of what gets signed and sent.
+`extension/src/` is three small files. Read them.
 
-`src/mint.ts` is about 250 lines and is the whole of what gets signed and sent. Read it.
+## Chain
 
-## Credits
+| Chain | ID | Explorer |
+|---|---|---|
+| Robinhood Chain | 4663 | robinhoodchain.blockscout.com |
 
-The local SeaDrop approach here — reading the drop from the singleton rather than the token contract, resolving the fee recipient on-chain, and passing `address(0)` as `minterIfNotPayer` — follows [nft-public-mint](https://github.com/morsyxbt/nft-public-mint) by [@morsyxbt](https://github.com/morsyxbt), MIT licensed. Credit where it is due.
+The CLI also carries Base and Ethereum configs. Adding a chain is one entry in
+`src/chains.ts`.
 
 ## Disclaimer
 
-Use at your own risk. Blockchain transactions are irreversible. This software is provided as is, without warranty of any kind.
+Use at your own risk. Blockchain transactions are irreversible. This software is
+provided as is, without warranty of any kind.
 
 ## License
 
 MIT — see [LICENSE](LICENSE).
 
-## Chrome extension
+`src/mint.ts` follows the SeaDrop call approach used in
+[nft-public-mint](https://github.com/morsyxbt/nft-public-mint) (MIT).
 
-The same engine as a browser extension, in `extension/`. No terminal, no Node.
+---
 
-1. Open `chrome://extensions`
-2. Turn on **Developer mode**
-3. **Load unpacked** and select the `extension/` folder
-
-Keys are encrypted with AES-GCM (PBKDF2-SHA256) before they touch extension
-storage. The manifest grants network access to Robinhood RPC endpoints and
-nothing else, so there is no server it could send them to.
-
-## Live site
-
-Scan any Robinhood Chain drop without installing anything:
-https://zsniper.vercel.app
+Made with ♥ by [zarv](https://x.com/zarvxbt)
