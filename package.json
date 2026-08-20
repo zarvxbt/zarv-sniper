@@ -1,0 +1,29 @@
+{
+  "name": "zarv-sniper",
+  "version": "1.0.0",
+  "description": "SeaDrop public mint sniper — builds calldata from on-chain state, no OpenSea account required",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsc && node dist/index.js",
+    "ui": "tsc && node dist/server.js"
+  },
+  "keywords": [
+    "nft",
+    "seadrop",
+    "mint",
+    "opensea",
+    "sniper"
+  ],
+  "author": "ZARV",
+  "license": "MIT",
+  "dependencies": {
+    "viem": "^2.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.5",
+    "typescript": "^5.3.3"
+  }
+}

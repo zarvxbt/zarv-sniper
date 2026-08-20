@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "ZARV Sniper",
+  "version": "1.0.0",
+  "description": "SeaDrop mint sniper for Robinhood Chain. Keys are encrypted locally and never leave this browser.",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://rpc.mainnet.chain.robinhood.com/*",
+    "https://sequencer.mainnet.chain.robinhood.com/*",
+    "https://robinhood-mainnet.g.alchemy.com/*"
+  ],
+  "background": { "service_worker": "background.js" },
+  "action": { "default_title": "Open ZARV Sniper" },
+  "icons": { "16": "icons/16.png", "48": "icons/48.png", "128": "icons/128.png" },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  }
+}

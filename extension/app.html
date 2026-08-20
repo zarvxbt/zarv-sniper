@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en" data-theme="steel">
+<head>
+<meta charset="utf-8">
+<title>ZARV // SNIPER</title>
+<style>
+  html[data-theme="steel"]{
+    --bg:#131b26;--panel:rgba(30,42,58,.9);--panel2:#111a25;--line:#31465e;--line2:#456b8c;
+    --text:#e9f4fb;--dim:#93aec4;--neon:#00e5ff;--neon2:#ff5ad9;--ok:#3ddc84;--warn:#ffc93c;--err:#ff5c76;
+    --rain:.07;--scan:.07;--vig:.3;--glow:.5;
+  }
+  html[data-theme="void"]{
+    --bg:#04050a;--panel:rgba(10,14,24,.84);--panel2:#060911;--line:#15304a;--line2:#1e4a6b;
+    --text:#d6f5ff;--dim:#4d7d99;--neon:#00f0ff;--neon2:#ff2bd6;--ok:#39ff8b;--warn:#ffd93d;--err:#ff3b5c;
+    --rain:.16;--scan:.2;--vig:.72;--glow:.75;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--text);overflow-x:hidden;
+    font:13px/1.6 ui-monospace,"SF Mono",Menlo,Consolas,monospace}
+  #rain{position:fixed;inset:0;z-index:0;opacity:var(--rain);pointer-events:none}
+  body::after{content:'';position:fixed;inset:0;z-index:9999;pointer-events:none;
+    background:repeating-linear-gradient(180deg,rgba(0,0,0,0) 0 2px,rgba(0,0,0,var(--scan)) 2px 4px);mix-blend-mode:multiply}
+  body::before{content:'';position:fixed;inset:0;z-index:9998;pointer-events:none;
+    background:radial-gradient(ellipse at 50% 40%,transparent 42%,rgba(0,0,0,var(--vig)) 100%)}
+  .wrap{position:relative;z-index:1}
+  svg.i{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:none}
+
+  /* lock screen */
+  #lock{position:fixed;inset:0;z-index:500;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:20px}
+  #lock .box{width:min(420px,92vw);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:26px;position:relative}
+  #lock .box::before,#lock .box::after{content:'';position:absolute;width:14px;height:14px}
+  #lock .box::before{top:-1px;left:-1px;border-top:2px solid var(--neon);border-left:2px solid var(--neon)}
+  #lock .box::after{bottom:-1px;right:-1px;border-bottom:2px solid var(--neon);border-right:2px solid var(--neon)}
+  #lock h1{margin:0 0 4px;font-size:26px;letter-spacing:.3em;color:var(--neon);text-shadow:0 0 12px rgba(0,229,255,var(--glow))}
+  #lock .s{color:var(--dim);font-size:10.5px;letter-spacing:.2em;margin-bottom:22px}
+  #lock .msg{font-size:11.5px;margin-top:12px;min-height:17px}
+
+  header{padding:18px 24px 14px;border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg,rgba(0,229,255,.06),transparent);
+    display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
+  .brandrow{display:flex;align-items:center;gap:12px}
+  .mark{width:36px;height:36px;border:1px solid var(--neon);border-radius:6px;display:grid;place-items:center;color:var(--neon)}
+  .mark svg{width:19px;height:19px}
+  .logo{font-size:26px;font-weight:800;letter-spacing:.3em;line-height:1;color:var(--neon);
+    text-shadow:0 0 10px rgba(0,229,255,var(--glow))}
+  .sub{color:var(--dim);font-size:10px;letter-spacing:.24em;margin-top:6px}
+  .hdr-right{display:flex;align-items:center;gap:13px;flex-wrap:wrap}
+  .status-leds{display:flex;gap:12px;font-size:10px;letter-spacing:.14em;color:var(--dim)}
+  .led{display:flex;align-items:center;gap:6px}
+  .led i{width:7px;height:7px;border-radius:50%;background:var(--line2);display:block;transition:.25s}
+  .led.on i{background:var(--ok);box-shadow:0 0 9px var(--ok)}
+  .led.err i{background:var(--err);box-shadow:0 0 9px var(--err)}
+  .chip{background:none;border:1px solid var(--line2);color:var(--dim);border-radius:5px;padding:7px 11px;
+    font:10px ui-monospace,monospace;letter-spacing:.14em;cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:.2s}
+  .chip:hover{color:var(--text);border-color:var(--neon)}
+  .chip.on{color:var(--neon);border-color:var(--neon);box-shadow:0 0 12px rgba(0,229,255,.22)}
+  .chip.locked{color:var(--warn);border-color:var(--warn)}
+
+  main{max-width:1240px;margin:0 auto;padding:20px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:16px}
+  @media(max-width:900px){main{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:16px;margin-bottom:16px;position:relative}
+  .card::before,.card::after{content:'';position:absolute;width:13px;height:13px;pointer-events:none}
+  .card::before{top:-1px;left:-1px;border-top:2px solid var(--neon);border-left:2px solid var(--neon)}
+  .card::after{bottom:-1px;right:-1px;border-bottom:2px solid var(--neon);border-right:2px solid var(--neon)}
+  .card h2{margin:0 0 13px;font-size:10.5px;letter-spacing:.24em;color:var(--neon);text-transform:uppercase;
+    display:flex;align-items:center;gap:9px}
+  .card h2::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,var(--line2),transparent)}
+  label{display:block;font-size:10px;color:var(--dim);margin:11px 0 5px;letter-spacing:.16em;text-transform:uppercase}
+  input,textarea{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:4px;
+    padding:10px 12px;font:13px ui-monospace,Menlo,Consolas,monospace;transition:.18s}
+  input:focus,textarea:focus{outline:none;border-color:var(--neon);box-shadow:0 0 0 1px rgba(0,229,255,.3)}
+  textarea{resize:vertical;min-height:86px}
+  textarea.masked{-webkit-text-security:disc}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  button{background:var(--panel2);border:1px solid var(--line2);color:var(--text);border-radius:4px;padding:11px 14px;
+    font:600 11.5px ui-monospace,Menlo,monospace;letter-spacing:.13em;cursor:pointer;text-transform:uppercase;transition:.18s;
+    display:inline-flex;align-items:center;justify-content:center;gap:8px}
+  button:hover:not(:disabled){border-color:var(--neon);color:var(--neon)}
+  button:disabled{opacity:.34;cursor:not-allowed}
+  button.pri{border-color:var(--neon);color:var(--neon)}
+  button.fire{width:100%;margin-top:15px;padding:16px;font-size:15px;letter-spacing:.4em;
+    border:1px solid var(--neon2);color:var(--neon2);background:rgba(255,90,217,.08)}
+  button.fire:hover:not(:disabled){color:#fff;background:rgba(255,90,217,.2);box-shadow:0 0 32px rgba(255,90,217,.4)}
+  button.fire:disabled{border-color:var(--line);color:var(--dim);background:none}
+  .armed{animation:armed 1.05s infinite}
+  @keyframes armed{50%{box-shadow:0 0 28px rgba(255,90,217,.4)}}
+  .hint{font-size:10.5px;color:var(--dim);margin-top:8px;line-height:1.6}
+  .wallets{display:flex;flex-direction:column;gap:6px;margin-top:12px}
+  .w{display:flex;align-items:center;gap:10px;background:var(--panel2);border:1px solid var(--line);
+    border-left:2px solid var(--dim);border-radius:4px;padding:9px 11px;font-size:11.5px}
+  .w .dot{width:7px;height:7px;border-radius:50%;background:var(--dim);flex:none}
+  .w.ok{border-left-color:var(--ok)} .w.ok .dot{background:var(--ok);box-shadow:0 0 9px var(--ok)}
+  .w.err{border-left-color:var(--err)} .w.err .dot{background:var(--err)}
+  .w.run{border-left-color:var(--warn)} .w.run .dot{background:var(--warn);animation:blink .55s infinite}
+  @keyframes blink{50%{opacity:0}}
+  .w .addr{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .w .bal{font-size:10px;color:var(--dim)}
+  .w .st{font-size:10px;color:var(--dim);letter-spacing:.12em;text-transform:uppercase}
+  .kv{display:flex;justify-content:space-between;gap:14px;padding:8px 0;border-bottom:1px solid var(--line);font-size:12px}
+  .kv:last-child{border-bottom:none}
+  .kv span:first-child{color:var(--dim);letter-spacing:.1em;text-transform:uppercase;font-size:10px;padding-top:2px}
+  .kv span:last-child{text-align:right;word-break:break-all}
+  .badge{display:inline-block;padding:3px 11px;border-radius:3px;font-size:9.5px;letter-spacing:.2em}
+  .badge.live{background:rgba(61,220,132,.13);color:var(--ok);border:1px solid rgba(61,220,132,.45)}
+  .badge.off{background:rgba(255,92,118,.13);color:var(--err);border:1px solid rgba(255,92,118,.45)}
+  #cd{display:none;margin-bottom:16px;text-align:center;padding:18px}
+  #cd .lbl{font-size:10px;letter-spacing:.3em;color:var(--dim);margin-bottom:8px}
+  #cd .t{font-size:38px;font-weight:800;letter-spacing:.08em;color:var(--neon);
+    text-shadow:0 0 16px rgba(0,229,255,var(--glow));font-variant-numeric:tabular-nums}
+  #cd.closing .t{color:var(--warn)} #cd.over .t{color:var(--err);font-size:24px}
+  #log{background:var(--panel2);border:1px solid var(--line);border-radius:4px;padding:12px;height:280px;
+    overflow:auto;font-size:11.5px;white-space:pre-wrap;word-break:break-word;line-height:1.75}
+  #log::-webkit-scrollbar{width:7px}
+  #log::-webkit-scrollbar-thumb{background:var(--line2);border-radius:4px}
+  #log .l{padding:1px 0;color:var(--dim)}
+  #log .l::before{content:'> ';color:var(--line2)}
+  #log .l.ok{color:var(--ok)} #log .l.err{color:var(--err)} #log .l.hi{color:var(--neon)}
+  .empty{color:var(--dim);font-size:11.5px;padding:10px 0}
+  footer{text-align:center;color:var(--dim);font-size:10px;padding:22px;letter-spacing:.2em}
+  a{color:var(--neon)}
+</style>
+</head>
+<body>
+<canvas id="rain"></canvas>
+
+<div id="lock">
+  <div class="box">
+    <h1>ZARV</h1>
+    <div class="s" id="lockmode">VAULT</div>
+    <div id="lockform"></div>
+    <div class="msg" id="lockmsg"></div>
+  </div>
+</div>
+
+<div class="wrap" id="app" style="display:none">
+<header>
+  <div class="brandrow">
+    <div class="mark"><svg viewBox="0 0 24 24" class="i"><path d="M12 2 4 6v6c0 4.4 3.4 8.2 8 10 4.6-1.8 8-5.6 8-10V6z"/><path d="M9 9h6l-6 6h6"/></svg></div>
+    <div>
+      <div class="logo">ZARV</div>
+      <div class="sub">SEADROP SNIPER // ROBINHOOD CHAIN // KEYS LOCAL</div>
+    </div>
+  </div>
+  <div class="hdr-right">
+    <div class="status-leds">
+      <div class="led on" id="led-vault"><i></i>VAULT</div>
+      <div class="led" id="led-drop"><i></i>DROP</div>
+    </div>
+    <button class="chip" id="theme" type="button">
+      <svg viewBox="0 0 24 24" class="i"><circle cx="12" cy="12" r="4.2"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19"/></svg>
+      <span id="themetxt">STEEL</span>
+    </button>
+    <button class="chip locked" id="snd" type="button">
+      <svg viewBox="0 0 24 24" class="i"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg>
+      <span id="sndtxt">ENABLE SND</span>
+    </button>
+    <button class="chip" id="lockbtn" type="button">
+      <svg viewBox="0 0 24 24" class="i"><rect x="4" y="10.5" width="16" height="10" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/></svg>LOCK
+    </button>
+  </div>
+</header>
+
+<main>
+  <div>
+    <div class="card">
+      <h2><svg viewBox="0 0 24 24" class="i"><rect x="2.5" y="6" width="19" height="13" rx="2.5"/><path d="M2.5 10h19"/><circle cx="17.5" cy="14.5" r="1.3"/></svg>Wallets</h2>
+      <div class="wallets" id="wallets"></div>
+      <div class="row" style="margin-top:12px">
+        <button type="button" id="refresh">
+          <svg viewBox="0 0 24 24" class="i"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 4v5h-5"/></svg>Balances
+        </button>
+        <button type="button" id="manage">
+          <svg viewBox="0 0 24 24" class="i"><path d="M12 3v11M8 10.5l4 4 4-4"/><path d="M4 17v3h16v-3"/></svg>Manage
+        </button>
+      </div>
+      <div id="managebox" style="display:none">
+        <label>Replace vault contents (one private key per line)</label>
+        <textarea id="newkeys" class="masked" spellcheck="false"></textarea>
+        <div class="row" style="margin-top:9px">
+          <button type="button" id="savekeys" class="pri">Save</button>
+          <button type="button" id="cancelkeys">Cancel</button>
+        </div>
+        <div class="hint">Re-encrypted with your existing password. Old set is replaced.</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2><svg viewBox="0 0 24 24" class="i"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3.4"/><path d="M12 1.5v4M12 18.5v4M1.5 12h4M18.5 12h4"/></svg>Target</h2>
+      <label>NFT contract</label>
+      <input id="contract" placeholder="0x..." spellcheck="false">
+      <div class="row">
+        <div><label>Qty / wallet</label><input id="qty" value="1"></div>
+        <div><label>RPC (blank = public)</label><input id="rpc" placeholder="URL or Alchemy key" spellcheck="false"></div>
+      </div>
+      <button type="button" id="check" class="pri" style="width:100%;margin-top:14px">
+        <svg viewBox="0 0 24 24" class="i"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 21 21"/></svg>Scan drop
+      </button>
+    </div>
+
+    <div class="card">
+      <h2><svg viewBox="0 0 24 24" class="i"><path d="M13 2 4.5 13.5H11L9.5 22 19 10h-6.5z"/></svg>Gas &amp; timing</h2>
+      <div class="row">
+        <div><label>Priority fee (gwei)</label><input id="tip" value="0.05"></div>
+        <div><label>Max fee (gwei)</label><input id="max" value="1"></div>
+      </div>
+      <div class="hint">Your ceiling reserves 250,000 &times; max fee from each wallet before the tx is accepted. High ceilings bounce thin wallets.</div>
+      <label>Fire at (HH:MM:SS &mdash; blank = now)</label>
+      <input id="at" placeholder="blank = fire immediately">
+      <button class="fire" id="fire" disabled>
+        <svg viewBox="0 0 24 24" class="i" style="width:17px;height:17px"><path d="M12 2c3.5 3.4 5.5 6.6 5.5 10a5.5 5.5 0 0 1-11 0c0-3.4 2-6.6 5.5-10z"/></svg>FIRE
+      </button>
+    </div>
+  </div>
+
+  <div>
+    <div class="card" id="cd">
+      <div class="lbl" id="cdlbl">STAGE OPENS IN</div>
+      <div class="t" id="cdt">--:--:--</div>
+    </div>
+    <div class="card">
+      <h2><svg viewBox="0 0 24 24" class="i"><path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5 12 12l9-4.5M12 12v9"/></svg>Drop</h2>
+      <div id="drop"><div class="empty">// awaiting scan</div></div>
+    </div>
+    <div class="card">
+      <h2><svg viewBox="0 0 24 24" class="i"><rect x="2.5" y="4" width="19" height="16" rx="2.5"/><path d="M6.5 9.5 9.5 12l-3 2.5M12 15h5.5"/></svg>Live feed</h2>
+      <div id="log"><div class="l">idle</div></div>
+    </div>
+  </div>
+</main>
+
+<footer>ZARV // KEYS ENCRYPTED IN THIS BROWSER // NO SERVER</footer>
+</div>
+<script src="app.bundle.js"></script>
+</body>
+</html>
